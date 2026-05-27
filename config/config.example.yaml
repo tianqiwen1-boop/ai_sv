@@ -1,0 +1,58 @@
+service:
+  name: bean-pattern-ai
+  log_level: INFO
+  callback_url: ${CALLBACK_URL}
+  callback_token: ${AI_CALLBACK_TOKEN}
+  callback_timeout_seconds: 15
+  callback_max_retries: 3
+  callback_retry_interval_seconds: 3
+  default_model: seadance-2.0
+
+rabbitmq:
+  host: ${RABBITMQ_HOST:localhost}
+  port: ${RABBITMQ_PORT:5672}
+  username: ${RABBITMQ_USERNAME:admin}
+  password: ${RABBITMQ_PASSWORD:admin123}
+  queue_name: ${AI_QUEUE_NAME:ai.generate.request.dev}
+  prefetch_count: 1
+  reconnect_interval_seconds: 5
+
+storage:
+  endpoint: ${S3_ENDPOINT}
+  access_key: ${S3_ACCESS_KEY}
+  secret_key: ${S3_SECRET_KEY}
+  bucket: ${S3_BUCKET}
+  region: ${S3_REGION:ap-guangzhou}
+  public_base_url: ${S3_PUBLIC_BASE_URL}
+  key_prefix: ${AI_S3_PREFIX:ai-results/}
+  path_style_access: ${S3_PATH_STYLE_ACCESS:false}
+  url_include_bucket: ${S3_URL_INCLUDE_BUCKET:false}
+  upload_max_retries: 3
+  upload_retry_interval_seconds: 2
+
+download:
+  max_retries: 3
+  retry_interval_seconds: 2
+  timeout_seconds: 60
+
+models:
+  seadance-2.0:
+    provider: jimeng
+    enabled: true
+    req_key: jimeng_t2i_v40
+    extra:
+      scale: 0.5
+      force_single: 1
+      poll_interval_seconds: 2
+      timeout_seconds: 300
+      return_url: true
+  jimeng-t2i-v40:
+    provider: jimeng
+    enabled: true
+    req_key: jimeng_t2i_v40
+    extra:
+      scale: 0.5
+      force_single: 1
+      poll_interval_seconds: 2
+      timeout_seconds: 300
+      return_url: true
