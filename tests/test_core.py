@@ -1,6 +1,4 @@
-import json
 import os
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -8,20 +6,21 @@ from unittest.mock import MagicMock, patch
 from app.callback import BackendCallbackClient
 from app.config import load_config
 from app.errors import NonRetryableError
+from app.grid_selector import choose_final_grid_size, resolve_candidate_grids
 from app.models import GenerateMessage
 from app.prompt import build_final_prompt
 
 
 class PromptTest(unittest.TestCase):
     def test_template_only(self) -> None:
-        self.assertEqual(build_final_prompt("固定提示词", ""), "固定提示词")
+        self.assertEqual(build_final_prompt("template", ""), "template")
 
     def test_template_and_user(self) -> None:
-        self.assertEqual(build_final_prompt("固定提示词", "补充说明"), "固定提示词 补充说明")
+        self.assertEqual(build_final_prompt("template", "extra"), "template extra")
 
     def test_empty_template_raises(self) -> None:
         with self.assertRaises(NonRetryableError):
-            build_final_prompt("", "补充")
+            build_final_prompt("", "extra")
 
 
 class MessageTest(unittest.TestCase):
@@ -30,14 +29,44 @@ class MessageTest(unittest.TestCase):
             "taskId": "AI123",
             "imageUrl": "https://example.com/a.png",
             "userPrompt": "hello",
-            "style": "Q版",
+            "style": "portrait",
             "promptTemplate": "template",
             "modelKey": "jimeng-t2i-v40",
+            "sizeMode": "default",
+            "gridMin": 30,
+            "gridMax": 80,
+            "candidateGrids": [32, 36, 40, 44, 48, 56, 64, 72, 80],
             "createdAt": "2026-05-25 12:00:00",
         }
         msg = GenerateMessage.model_validate(raw)
         self.assertEqual(msg.taskId, "AI123")
         self.assertEqual(msg.modelKey, "jimeng-t2i-v40")
+        self.assertEqual(msg.gridMin, 30)
+
+
+class GridSelectorTest(unittest.TestCase):
+    def test_default_candidates_snap_detected(self) -> None:
+        msg = GenerateMessage(
+            taskId="AI123",
+            imageUrl="https://example.com/a.png",
+            style="portrait",
+            promptTemplate="template",
+            sizeMode="default",
+            gridMin=30,
+            gridMax=80,
+        )
+        self.assertEqual(resolve_candidate_grids(msg), [32, 36, 40, 44, 48, 56, 64, 72, 80])
+        self.assertEqual(choose_final_grid_size(msg, 46, 46), 48)
+
+    def test_small_fallback(self) -> None:
+        msg = GenerateMessage(
+            taskId="AI123",
+            imageUrl="https://example.com/a.png",
+            style="portrait",
+            promptTemplate="template",
+            sizeMode="small",
+        )
+        self.assertEqual(choose_final_grid_size(msg, None, None), 32)
 
 
 class ConfigTest(unittest.TestCase):
@@ -54,7 +83,7 @@ class ConfigTest(unittest.TestCase):
         }
         with patch.dict(os.environ, env, clear=False):
             config = load_config(str(example))
-            self.assertEqual(config.service.default_model, "jimeng-t2i-v40")
+            self.assertEqual(config.service.default_model, "seadance-2.0")
             model = config.get_model("jimeng-t2i-v40")
             self.assertEqual(model.provider, "jimeng")
             self.assertEqual(model.extra["poll_interval_seconds"], 2)
@@ -81,11 +110,25 @@ class CallbackTest(unittest.TestCase):
         mock_resp.json.return_value = {"code": 0, "message": "ok", "data": None}
 
         with patch.object(client._session, "post", return_value=mock_resp) as post:
-            client.processing("AI123")
+            client.success(
+                "AI123",
+                "https://example.com/refined.png",
+                raw_image_url="https://example.com/raw.png",
+                size_mode="default",
+                grid_min=30,
+                grid_max=80,
+                detected_grid_width=46,
+                detected_grid_height=46,
+                final_grid_width=48,
+                final_grid_height=48,
+                perfect_pixel_status="SUCCESS",
+            )
             post.assert_called_once()
             payload = post.call_args.kwargs["json"]
-            self.assertEqual(payload["status"], "PROCESSING")
-            self.assertIsNone(payload["aiImageUrl"])
+            self.assertEqual(payload["status"], "SUCCESS")
+            self.assertEqual(payload["aiImageUrl"], "https://example.com/refined.png")
+            self.assertEqual(payload["rawAiImageUrl"], "https://example.com/raw.png")
+            self.assertEqual(payload["finalGridWidth"], 48)
             self.assertIsNone(payload["errorMessage"])
 
 

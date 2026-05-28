@@ -8,7 +8,9 @@ from typing import TYPE_CHECKING
 from pydantic import ValidationError
 
 from app.errors import NonRetryableError
+from app.grid_selector import choose_final_grid_size, resolve_grid_range
 from app.models import GenerateMessage
+from app.perfect_pixel_processor import PerfectPixelProcessor
 
 if TYPE_CHECKING:
     from app.callback import BackendCallbackClient
@@ -28,6 +30,7 @@ class MessageHandler:
         self._generator = generator
         self._storage = storage
         self._callback = callback
+        self._perfect_pixel = PerfectPixelProcessor()
 
     def handle(self, raw_body: bytes) -> None:
         started = time.monotonic()
@@ -60,8 +63,40 @@ class MessageHandler:
             self._safe_processing_callback(task_id)
 
             image_bytes = self._generator.generate(message)
-            result_url = self._storage.upload_png(task_id, image_bytes)
-            self._callback.success(task_id, result_url)
+            raw_url = self._storage.upload_png(task_id, image_bytes, variant="raw")
+
+            detected_w: int | None = None
+            detected_h: int | None = None
+            perfect_pixel_status = "SUCCESS"
+            perfect_pixel_error: str | None = None
+            result_url = raw_url
+
+            try:
+                refined = self._perfect_pixel.refine(image_bytes)
+                detected_w = refined.width
+                detected_h = refined.height
+                result_url = self._storage.upload_png(task_id, refined.png_bytes, variant="refined")
+            except Exception as exc:
+                perfect_pixel_status = "FAILED"
+                perfect_pixel_error = str(exc)[:1000]
+                logger.warning("Perfect Pixel 澶辫触 taskId=%s error=%s", task_id, exc)
+
+            final_grid = choose_final_grid_size(message, detected_w, detected_h)
+            grid_min, grid_max = resolve_grid_range(message)
+            self._callback.success(
+                task_id,
+                result_url,
+                raw_image_url=raw_url,
+                size_mode=message.sizeMode,
+                grid_min=grid_min,
+                grid_max=grid_max,
+                detected_grid_width=detected_w,
+                detected_grid_height=detected_h,
+                final_grid_width=final_grid,
+                final_grid_height=final_grid,
+                perfect_pixel_status=perfect_pixel_status,
+                perfect_pixel_error=perfect_pixel_error,
+            )
 
             elapsed = time.monotonic() - started
             logger.info(

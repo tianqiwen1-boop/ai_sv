@@ -5,6 +5,8 @@ pydantic==2.9.2
 PyYAML==6.0.2
 boto3==1.35.36
 Pillow==11.0.0
+numpy>=1.24.0
+perfect-pixel[opencv]>=0.1.4
 # Windows 需使用带预编译 wheel 的版本；1.0.180 会强依赖 pycryptodome==3.9.9 导致编译失败
 pycryptodome>=3.20.0
 volcengine>=1.0.221

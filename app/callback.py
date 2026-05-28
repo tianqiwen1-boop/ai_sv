@@ -32,12 +32,37 @@ class BackendCallbackClient:
             )
         )
 
-    def success(self, task_id: str, image_url: str) -> None:
+    def success(
+        self,
+        task_id: str,
+        image_url: str,
+        *,
+        raw_image_url: str | None = None,
+        size_mode: str | None = None,
+        grid_min: int | None = None,
+        grid_max: int | None = None,
+        detected_grid_width: int | None = None,
+        detected_grid_height: int | None = None,
+        final_grid_width: int | None = None,
+        final_grid_height: int | None = None,
+        perfect_pixel_status: str | None = None,
+        perfect_pixel_error: str | None = None,
+    ) -> None:
         self._send(
             CallbackPayload(
                 taskId=task_id,
                 status="SUCCESS",
                 aiImageUrl=image_url,
+                rawAiImageUrl=raw_image_url,
+                sizeMode=size_mode,
+                gridMin=grid_min,
+                gridMax=grid_max,
+                detectedGridWidth=detected_grid_width,
+                detectedGridHeight=detected_grid_height,
+                finalGridWidth=final_grid_width,
+                finalGridHeight=final_grid_height,
+                perfectPixelStatus=perfect_pixel_status,
+                perfectPixelError=perfect_pixel_error,
                 errorMessage=None,
             )
         )

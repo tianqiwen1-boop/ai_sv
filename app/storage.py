@@ -26,8 +26,8 @@ class ImageStorage:
             config=BotoConfig(s3={"addressing_style": "path" if config.path_style_access else "virtual"}),
         )
 
-    def upload_png(self, task_id: str, image_bytes: bytes) -> str:
-        key = self._build_object_key(task_id)
+    def upload_png(self, task_id: str, image_bytes: bytes, variant: str | None = None) -> str:
+        key = self._build_object_key(task_id, variant)
 
         def _upload() -> None:
             self._client.put_object(
@@ -50,12 +50,13 @@ class ImageStorage:
         logger.info("上传成功 taskId=%s key=%s url=%s", task_id, key, url)
         return url
 
-    def _build_object_key(self, task_id: str) -> str:
+    def _build_object_key(self, task_id: str, variant: str | None = None) -> str:
         now = datetime.now(SHANGHAI_TZ)
         prefix = self._config.key_prefix.strip("/")
         if prefix:
             prefix = f"{prefix}/"
-        return f"{prefix}{now:%Y/%m/%d}/{task_id}.png"
+        suffix = f"_{variant}" if variant else ""
+        return f"{prefix}{now:%Y/%m/%d}/{task_id}{suffix}.png"
 
     def _build_public_url(self, key: str) -> str:
         base = self._config.public_base_url.rstrip("/")
