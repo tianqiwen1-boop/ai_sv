@@ -8,6 +8,7 @@ from app.config import load_config
 from app.errors import NonRetryableError
 from app.grid_selector import choose_final_grid_size, resolve_candidate_grids
 from app.models import GenerateMessage
+from app.perfect_pixel_processor import PerfectPixelProcessor
 from app.prompt import build_final_prompt
 
 
@@ -69,6 +70,25 @@ class GridSelectorTest(unittest.TestCase):
         self.assertEqual(choose_final_grid_size(msg, None, None), 32)
 
 
+class PerfectPixelProcessorTest(unittest.TestCase):
+    def test_detects_center_cross_seam(self) -> None:
+        import numpy as np
+
+        image = np.full((48, 48, 3), [80, 60, 70], dtype=np.uint8)
+        image[24, :, :] = 255
+        image[:, 24, :] = 255
+
+        self.assertTrue(PerfectPixelProcessor._has_center_cross_seam(image))
+
+    def test_allows_plain_white_background(self) -> None:
+        import numpy as np
+
+        image = np.full((48, 48, 3), 255, dtype=np.uint8)
+        image[12:36, 12:36, :] = [80, 60, 70]
+
+        self.assertFalse(PerfectPixelProcessor._has_center_cross_seam(image))
+
+
 class ConfigTest(unittest.TestCase):
     def test_load_config_with_env(self) -> None:
         example = Path(__file__).resolve().parents[1] / "config" / "config.example.yaml"
@@ -80,6 +100,8 @@ class ConfigTest(unittest.TestCase):
             "S3_BUCKET": "bucket",
             "S3_PUBLIC_BASE_URL": "https://example.com",
             "S3_ENDPOINT": "https://cos.example.com",
+            "VOLC_ACCESS_KEY_ID": "test-ak",
+            "VOLC_SECRET_ACCESS_KEY": "test-sk",
         }
         with patch.dict(os.environ, env, clear=False):
             config = load_config(str(example))
@@ -113,7 +135,9 @@ class CallbackTest(unittest.TestCase):
             client.success(
                 "AI123",
                 "https://example.com/refined.png",
+                image_key="ai-results/dev/refined.png",
                 raw_image_url="https://example.com/raw.png",
+                raw_image_key="ai-results/dev/raw.png",
                 size_mode="default",
                 grid_min=30,
                 grid_max=80,
@@ -127,7 +151,9 @@ class CallbackTest(unittest.TestCase):
             payload = post.call_args.kwargs["json"]
             self.assertEqual(payload["status"], "SUCCESS")
             self.assertEqual(payload["aiImageUrl"], "https://example.com/refined.png")
+            self.assertEqual(payload["aiImageKey"], "ai-results/dev/refined.png")
             self.assertEqual(payload["rawAiImageUrl"], "https://example.com/raw.png")
+            self.assertEqual(payload["rawAiImageKey"], "ai-results/dev/raw.png")
             self.assertEqual(payload["finalGridWidth"], 48)
             self.assertIsNone(payload["errorMessage"])
 

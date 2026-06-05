@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 
 import boto3
@@ -12,6 +13,12 @@ from app.retry import retry_call
 
 logger = logging.getLogger(__name__)
 SHANGHAI_TZ = timezone(timedelta(hours=8))
+
+
+@dataclass(frozen=True)
+class StoredImage:
+    url: str
+    key: str
 
 
 class ImageStorage:
@@ -26,7 +33,7 @@ class ImageStorage:
             config=BotoConfig(s3={"addressing_style": "path" if config.path_style_access else "virtual"}),
         )
 
-    def upload_png(self, task_id: str, image_bytes: bytes, variant: str | None = None) -> str:
+    def upload_png(self, task_id: str, image_bytes: bytes, variant: str | None = None) -> StoredImage:
         key = self._build_object_key(task_id, variant)
 
         def _upload() -> None:
@@ -48,7 +55,7 @@ class ImageStorage:
 
         url = self._build_public_url(key)
         logger.info("上传成功 taskId=%s key=%s url=%s", task_id, key, url)
-        return url
+        return StoredImage(url=url, key=key)
 
     def _build_object_key(self, task_id: str, variant: str | None = None) -> str:
         now = datetime.now(SHANGHAI_TZ)

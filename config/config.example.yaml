@@ -1,51 +1,136 @@
+# ============================================================================
+# AI Service 配置文件
+# ============================================================================
+# 环境变量使用 ${VAR_NAME} 或 ${VAR_NAME:默认值} 语法，启动时自动替换。
+# 所有敏感信息（密钥、token）必须通过环境变量传入，禁止硬编码。
+# ============================================================================
+
+# ---------------------------------------------------------------------------
+# service — 服务自身配置
+# ---------------------------------------------------------------------------
 service:
   name: bean-pattern-ai
-  log_level: INFO
-  callback_url: ${CALLBACK_URL}
-  callback_token: ${AI_CALLBACK_TOKEN}
+  log_level: INFO                # DEBUG | INFO | WARNING | ERROR
+  callback_url: ${CALLBACK_URL}  # Java 后端回调地址，任务完成后通知
+  callback_token: ${AI_CALLBACK_TOKEN}  # 回调鉴权 token，需与 Java 侧一致
   callback_timeout_seconds: 15
   callback_max_retries: 3
   callback_retry_interval_seconds: 3
-  default_model: seadance-2.0
+  default_model: seadance-2.0   # 消息未指定 modelKey 时使用的默认模型
 
+# ---------------------------------------------------------------------------
+# rabbitmq — 消息队列连接
+# ---------------------------------------------------------------------------
 rabbitmq:
   host: ${RABBITMQ_HOST:localhost}
   port: ${RABBITMQ_PORT:5672}
   username: ${RABBITMQ_USERNAME:admin}
   password: ${RABBITMQ_PASSWORD:admin123}
   queue_name: ${AI_QUEUE_NAME:ai.generate.request.dev}
-  prefetch_count: 1
-  reconnect_interval_seconds: 5
+  prefetch_count: 1             # 每次只取一条消息，处理完再取下一条
+  reconnect_interval_seconds: 5 # 断连后重试间隔
 
+# ---------------------------------------------------------------------------
+# storage — 生成结果存储（S3 兼容协议，当前使用腾讯云 COS）
+# ---------------------------------------------------------------------------
 storage:
   endpoint: ${S3_ENDPOINT}
   access_key: ${S3_ACCESS_KEY}
   secret_key: ${S3_SECRET_KEY}
   bucket: ${S3_BUCKET}
   region: ${S3_REGION:ap-guangzhou}
-  public_base_url: ${S3_PUBLIC_BASE_URL}
-  key_prefix: ${AI_S3_PREFIX:ai-results/}
+  public_base_url: ${S3_PUBLIC_BASE_URL}  # 对外可访问的 CDN / COS 域名
+  key_prefix: ${AI_S3_PREFIX:ai-results/} # 存储路径前缀
   path_style_access: ${S3_PATH_STYLE_ACCESS:false}
   url_include_bucket: ${S3_URL_INCLUDE_BUCKET:false}
   upload_max_retries: 3
   upload_retry_interval_seconds: 2
 
+# ---------------------------------------------------------------------------
+# download — 从 AI 厂商下载生成结果图的通用配置
+# ---------------------------------------------------------------------------
 download:
   max_retries: 3
   retry_interval_seconds: 2
   timeout_seconds: 60
 
+# ============================================================================
+# providers — AI 厂商 / 网关配置
+# ============================================================================
+# 每个 provider 代表一个 AI 图片生成服务接入点，包含：
+#   type       — Provider 实现类标识，对应 app/providers/ 下的同名模块
+#                和 generator.py 中 _PROVIDER_CLASSES 的 key
+#   base_url   — API 根地址
+#   api_key    — Bearer token 或 AK（语义由具体 provider 解释）
+#   api_secret — SK（即梦 / 火山引擎 AK/SK 签名场景使用，其他 provider 可留空）
+#   extra      — provider 级额外参数，透传给 Provider 实现（可选）
+#
+# 接入新厂商的步骤：
+#   1. 在此处新增一个 provider 条目
+#   2. 在 app/providers/ 下新建 {type}.py，继承 ImageProvider 实现 generate()
+#   3. 在 generator.py 的 _PROVIDER_CLASSES 中注册：{"type": XxxProvider}
+#   4. 在 models 区块配置引用该 provider 的模型
+# ============================================================================
+providers:
+  # 即梦（火山引擎）— AK/SK 签名鉴权，异步轮询
+  jimeng:
+    type: jimeng
+    base_url: ${VOLC_VISUAL_HOST:visual.volcengineapi.com}
+    api_key: ${VOLC_ACCESS_KEY_ID}       # Access Key
+    api_secret: ${VOLC_SECRET_ACCESS_KEY} # Secret Key
+
+  # ---- 以下为可扩展的 provider 模板（取消注释即可启用） ----
+
+  # 硅基流动 SiliconFlow — Bearer token 鉴权，OpenAI 兼容路径但参数非标
+  # siliconflow:
+  #   type: siliconflow
+  #   base_url: https://api.siliconflow.com/v1
+  #   api_key: ${SILICONFLOW_API_KEY}
+
+  # 通义千问（阿里云 DashScope / 百炼）— Bearer token 鉴权，异步轮询
+  # dashscope:
+  #   type: dashscope
+  #   base_url: https://dashscope.aliyuncs.com/api/v1
+  #   api_key: ${DASHSCOPE_API_KEY}
+
+  # Replicate 平台 — Bearer token 鉴权，可运行 FLUX / SD 等数十种模型
+  # replicate:
+  #   type: replicate
+  #   base_url: https://api.replicate.com/v1
+  #   api_key: ${REPLICATE_API_KEY}
+
+  # Stability AI — Bearer token 鉴权，multipart/form-data 请求
+  # stability:
+  #   type: stability
+  #   base_url: https://api.stability.ai
+  #   api_key: ${STABILITY_API_KEY}
+
+# ============================================================================
+# models — 模型列表
+# ============================================================================
+# 每个模型条目包含：
+#   provider — 引用上方 providers 区块的 key，决定由哪个厂商服务此模型
+#   enabled  — true/false，禁用后请求该 modelKey 会直接拒绝
+#   req_key  — 传给厂商的模型标识（即梦的 req_key、OpenAI 的 model 名等）
+#   extra    — 模型级参数，透传给 Provider 实现（poll 配置、尺寸、风格等）
+#
+# 新增模型的步骤：
+#   1. 确保 provider 已在 providers 区块配置
+#   2. 在此处新增模型条目，key 即为 modelKey（前端传参用）
+#   3. 如需设为默认模型，修改上方 service.default_model
+# ============================================================================
 models:
   seadance-2.0:
     provider: jimeng
     enabled: true
-    req_key: jimeng_t2i_v40
+    req_key: jimeng_t2i_v40       # 即梦文生图 4.0，支持参考图输入
     extra:
-      scale: 0.5
-      force_single: 1
-      poll_interval_seconds: 2
-      timeout_seconds: 300
+      scale: 0.5                  # 参考图影响强度 0~1
+      force_single: 1             # 强制单图输出
+      poll_interval_seconds: 2    # 轮询间隔
+      timeout_seconds: 300        # 任务超时（秒）
       return_url: true
+
   jimeng-t2i-v40:
     provider: jimeng
     enabled: true
@@ -56,3 +141,30 @@ models:
       poll_interval_seconds: 2
       timeout_seconds: 300
       return_url: true
+
+  # ---- 以下为可扩展的模型模板（取消注释即可启用） ----
+
+  # siliconflow 上的 FLUX.1 Kontext（图生图编辑）
+  # flux-kontext-pro:
+  #   provider: siliconflow
+  #   enabled: false
+  #   req_key: black-forest-labs/FLUX.1-Kontext-pro
+  #   extra:
+  #     image_size: 1024x1024
+
+  # 通义千问图像编辑
+  # qwen-image-edit:
+  #   provider: dashscope
+  #   enabled: false
+  #   req_key: qwen-image-edit-max
+  #   extra:
+  #     n: 1
+
+  # Replicate 上的 FLUX.1 Kontext（与 siliconflow 不同，走 Replicate API）
+  # flux-kontext-replicate:
+  #   provider: replicate
+  #   enabled: false
+  #   req_key: black-forest-labs/flux-kontext-pro
+  #   extra:
+  #     num_outputs: 1
+  #     aspect_ratio: "1:1"

@@ -49,7 +49,7 @@ def choose_final_grid_size(
 
     if detected_width and detected_height and detected_width > 0 and detected_height > 0:
         detected = (float(detected_width) + float(detected_height)) / 2.0
-        return min(candidates, key=lambda value: abs(value - detected))
+        return min(candidates, key=lambda value: (abs(value - detected), 0 if value >= detected else 1))
 
     if fallback in candidates:
         return fallback

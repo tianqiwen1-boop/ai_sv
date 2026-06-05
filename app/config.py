@@ -60,6 +60,16 @@ class DownloadConfig:
 
 
 @dataclass
+class ProviderConfig:
+    name: str
+    type: str
+    base_url: str = ""
+    api_key: str = ""
+    api_secret: str = ""
+    extra: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class ModelConfig:
     key: str
     provider: str
@@ -74,6 +84,7 @@ class AppConfig:
     rabbitmq: RabbitMQConfig
     storage: StorageConfig
     download: DownloadConfig
+    providers: dict[str, ProviderConfig]
     models: dict[str, ModelConfig]
 
     def get_model(self, model_key: str | None) -> ModelConfig:
@@ -84,6 +95,13 @@ class AppConfig:
         if not model.enabled:
             raise NonRetryableError(f"modelKey 已禁用: {key}")
         return model
+
+    def get_model_with_provider(self, model_key: str | None) -> tuple[ModelConfig, ProviderConfig]:
+        model = self.get_model(model_key)
+        provider = self.providers.get(model.provider)
+        if provider is None:
+            raise NonRetryableError(f"provider 不存在: {model.provider}")
+        return model, provider
 
 
 def _substitute_env(value: str) -> str:
@@ -132,6 +150,7 @@ def load_config(config_path: str | None = None) -> AppConfig:
     rabbit_raw = data.get("rabbitmq") or {}
     storage_raw = data.get("storage") or {}
     download_raw = data.get("download") or {}
+    providers_raw = data.get("providers") or {}
     models_raw = data.get("models") or {}
 
     service = ServiceConfig(
@@ -172,6 +191,19 @@ def load_config(config_path: str | None = None) -> AppConfig:
         timeout_seconds=int(download_raw.get("timeout_seconds", 60)),
     )
 
+    providers: dict[str, ProviderConfig] = {}
+    for key, prov_raw in providers_raw.items():
+        if not isinstance(prov_raw, dict):
+            continue
+        providers[key] = ProviderConfig(
+            name=key,
+            type=str(prov_raw.get("type", "")),
+            base_url=str(prov_raw.get("base_url", "")),
+            api_key=str(prov_raw.get("api_key", "")),
+            api_secret=str(prov_raw.get("api_secret", "")),
+            extra=dict(prov_raw.get("extra") or {}),
+        )
+
     models: dict[str, ModelConfig] = {}
     for key, model_raw in models_raw.items():
         if not isinstance(model_raw, dict):
@@ -189,6 +221,7 @@ def load_config(config_path: str | None = None) -> AppConfig:
         rabbitmq=rabbitmq,
         storage=storage,
         download=download,
+        providers=providers,
         models=models,
     )
     validate_config(config)
@@ -209,12 +242,22 @@ def validate_config(config: AppConfig) -> None:
         missing.append("storage.bucket / S3_BUCKET")
     if not config.storage.public_base_url:
         missing.append("storage.public_base_url / S3_PUBLIC_BASE_URL")
+    if not config.providers:
+        missing.append("providers（至少配置一个 provider）")
     if not config.models:
         missing.append("models（至少配置一个模型）")
     if config.service.default_model not in config.models:
         missing.append(f"default_model 未配置: {config.service.default_model}")
 
+    for model in config.models.values():
+        if model.provider not in config.providers:
+            missing.append(f"模型 {model.key} 引用的 provider 不存在: {model.provider}")
+
     if missing:
         raise ConfigError("配置校验失败: " + ", ".join(missing))
 
-    logging.getLogger(__name__).debug("配置校验通过，已加载 %d 个模型", len(config.models))
+    logging.getLogger(__name__).debug(
+        "配置校验通过，已加载 %d 个 provider、%d 个模型",
+        len(config.providers),
+        len(config.models),
+    )

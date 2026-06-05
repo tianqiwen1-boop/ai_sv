@@ -22,7 +22,9 @@ class CallbackPayload(BaseModel):
     taskId: str
     status: str
     aiImageUrl: str | None = None
+    aiImageKey: str | None = None
     rawAiImageUrl: str | None = None
+    rawAiImageKey: str | None = None
     sizeMode: str | None = None
     gridMin: int | None = None
     gridMax: int | None = None

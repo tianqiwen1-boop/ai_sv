@@ -63,19 +63,19 @@ class MessageHandler:
             self._safe_processing_callback(task_id)
 
             image_bytes = self._generator.generate(message)
-            raw_url = self._storage.upload_png(task_id, image_bytes, variant="raw")
+            raw_image = self._storage.upload_png(task_id, image_bytes, variant="raw")
 
             detected_w: int | None = None
             detected_h: int | None = None
             perfect_pixel_status = "SUCCESS"
             perfect_pixel_error: str | None = None
-            result_url = raw_url
+            result_image = raw_image
 
             try:
                 refined = self._perfect_pixel.refine(image_bytes)
                 detected_w = refined.width
                 detected_h = refined.height
-                result_url = self._storage.upload_png(task_id, refined.png_bytes, variant="refined")
+                result_image = self._storage.upload_png(task_id, refined.png_bytes, variant="refined")
             except Exception as exc:
                 perfect_pixel_status = "FAILED"
                 perfect_pixel_error = str(exc)[:1000]
@@ -85,8 +85,10 @@ class MessageHandler:
             grid_min, grid_max = resolve_grid_range(message)
             self._callback.success(
                 task_id,
-                result_url,
-                raw_image_url=raw_url,
+                result_image.url,
+                image_key=result_image.key,
+                raw_image_url=raw_image.url,
+                raw_image_key=raw_image.key,
                 size_mode=message.sizeMode,
                 grid_min=grid_min,
                 grid_max=grid_max,
@@ -104,7 +106,7 @@ class MessageHandler:
                 task_id,
                 model_key,
                 elapsed,
-                result_url,
+                result_image.url,
             )
         except NonRetryableError as exc:
             elapsed = time.monotonic() - started
