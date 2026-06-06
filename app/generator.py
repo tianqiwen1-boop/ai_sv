@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+import importlib
 import logging
 
 from app.config import AppConfig
 from app.errors import NonRetryableError
 from app.models import GenerateMessage
 from app.providers.base import ImageProvider
-from app.providers.jimeng import JimengProvider
 
 logger = logging.getLogger(__name__)
 
-_PROVIDER_CLASSES: dict[str, type[ImageProvider]] = {
-    "jimeng": JimengProvider,
+_PROVIDER_IMPORTS: dict[str, tuple[str, str]] = {
+    "jimeng": ("app.providers.jimeng", "JimengProvider"),
+    "seedream": ("app.providers.seedream", "SeedreamProvider"),
 }
 
 
@@ -22,10 +23,18 @@ class ImageGenerator:
 
     def _get_provider_instance(self, provider_type: str) -> ImageProvider:
         if provider_type not in self._instances:
-            cls = _PROVIDER_CLASSES.get(provider_type)
-            if cls is None:
-                raise NonRetryableError(f"不支持的 provider 类型: {provider_type}")
-            self._instances[provider_type] = cls(self._config.download)
+            target = _PROVIDER_IMPORTS.get(provider_type)
+            if target is None:
+                raise NonRetryableError(f"unsupported provider type: {provider_type}")
+
+            module_name, class_name = target
+            try:
+                module = importlib.import_module(module_name)
+                provider_cls = getattr(module, class_name)
+            except Exception as exc:
+                raise NonRetryableError(f"failed to load provider {provider_type}: {exc}") from exc
+
+            self._instances[provider_type] = provider_cls(self._config.download)
         return self._instances[provider_type]
 
     def generate(self, message: GenerateMessage) -> bytes:

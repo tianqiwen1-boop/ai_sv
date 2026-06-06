@@ -102,6 +102,7 @@ class ConfigTest(unittest.TestCase):
             "S3_ENDPOINT": "https://cos.example.com",
             "VOLC_ACCESS_KEY_ID": "test-ak",
             "VOLC_SECRET_ACCESS_KEY": "test-sk",
+            "ARK_API_KEY": "test-ark-key",
         }
         with patch.dict(os.environ, env, clear=False):
             config = load_config(str(example))
@@ -109,6 +110,91 @@ class ConfigTest(unittest.TestCase):
             model = config.get_model("jimeng-t2i-v40")
             self.assertEqual(model.provider, "jimeng")
             self.assertEqual(model.extra["poll_interval_seconds"], 2)
+            seedream_model = config.models["seedream-5-lite"]
+            self.assertEqual(seedream_model.provider, "seedream")
+            self.assertFalse(seedream_model.enabled)
+
+
+class SeedreamProviderTest(unittest.TestCase):
+    def test_extract_image_url(self) -> None:
+        from app.providers.seedream import SeedreamProvider
+
+        payload = {
+            "data": [
+                {
+                    "url": "https://example.com/result.png",
+                    "size": "2048x2048",
+                }
+            ]
+        }
+        self.assertEqual(
+            SeedreamProvider._extract_image_url(payload),
+            "https://example.com/result.png",
+        )
+
+    def test_extract_image_url_raises_on_error(self) -> None:
+        from app.providers.seedream import SeedreamProvider
+
+        with self.assertRaises(NonRetryableError):
+            SeedreamProvider._extract_image_url({"error": {"message": "bad request"}})
+
+    def test_generate_image_url_payload(self) -> None:
+        from app.config import DownloadConfig, ModelConfig, ProviderConfig
+        from app.providers.seedream import SeedreamProvider
+
+        provider = SeedreamProvider(
+            DownloadConfig(max_retries=1, retry_interval_seconds=0, timeout_seconds=5)
+        )
+        provider_cfg = ProviderConfig(
+            name="seedream",
+            type="seedream",
+            base_url="https://ark.example.com/api/v3",
+            api_key="test-key",
+        )
+        model = ModelConfig(
+            key="seedream-5-lite",
+            provider="seedream",
+            enabled=True,
+            req_key="doubao-seedream-5-0-260128",
+            extra={"timeout_seconds": 5},
+        )
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "data": [{"url": "https://example.com/output.png"}]
+        }
+        mock_resp.raise_for_status.return_value = None
+
+        with patch.object(provider._session, "post", return_value=mock_resp) as post:
+            url = provider._generate_image_url(
+                provider=provider_cfg,
+                model=model,
+                prompt="pixel prompt",
+                image_url="https://example.com/input.png",
+                size="2K",
+                output_format="png",
+                response_format="url",
+                watermark=False,
+                sequential_image_generation="disabled",
+                optimize_prompt_options=None,
+                seed=None,
+            )
+
+        self.assertEqual(url, "https://example.com/output.png")
+        post.assert_called_once()
+        self.assertEqual(
+            post.call_args.args[0],
+            "https://ark.example.com/api/v3/images/generations",
+        )
+        self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "Bearer test-key")
+        payload = post.call_args.kwargs["json"]
+        self.assertEqual(payload["model"], "doubao-seedream-5-0-260128")
+        self.assertEqual(payload["prompt"], "pixel prompt")
+        self.assertEqual(payload["image"], "https://example.com/input.png")
+        self.assertEqual(payload["response_format"], "url")
+        self.assertEqual(payload["output_format"], "png")
+        self.assertFalse(payload["watermark"])
+        self.assertEqual(payload["sequential_image_generation"], "disabled")
 
 
 class CallbackTest(unittest.TestCase):

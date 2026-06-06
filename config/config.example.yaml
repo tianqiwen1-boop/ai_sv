@@ -79,6 +79,11 @@ providers:
     api_key: ${VOLC_ACCESS_KEY_ID}       # Access Key
     api_secret: ${VOLC_SECRET_ACCESS_KEY} # Secret Key
 
+  seedream:
+    type: seedream
+    base_url: ${ARK_BASE_URL:https://ark.cn-beijing.volces.com/api/v3}
+    api_key: ${ARK_API_KEY}
+
   # ---- 以下为可扩展的 provider 模板（取消注释即可启用） ----
 
   # 硅基流动 SiliconFlow — Bearer token 鉴权，OpenAI 兼容路径但参数非标
@@ -141,6 +146,18 @@ models:
       poll_interval_seconds: 2
       timeout_seconds: 300
       return_url: true
+
+  seedream-5-lite:
+    provider: seedream
+    enabled: false
+    req_key: doubao-seedream-5-0-260128
+    extra:
+      size: 2K
+      output_format: png
+      response_format: url
+      watermark: false
+      sequential_image_generation: disabled
+      timeout_seconds: 300
 
   # ---- 以下为可扩展的模型模板（取消注释即可启用） ----
 
