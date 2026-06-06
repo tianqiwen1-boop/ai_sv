@@ -106,13 +106,13 @@ class ConfigTest(unittest.TestCase):
         }
         with patch.dict(os.environ, env, clear=False):
             config = load_config(str(example))
-            self.assertEqual(config.service.default_model, "seadance-2.0")
+            self.assertEqual(config.service.default_model, "seedream-5-lite")
             model = config.get_model("jimeng-t2i-v40")
             self.assertEqual(model.provider, "jimeng")
             self.assertEqual(model.extra["poll_interval_seconds"], 2)
             seedream_model = config.models["seedream-5-lite"]
             self.assertEqual(seedream_model.provider, "seedream")
-            self.assertFalse(seedream_model.enabled)
+            self.assertTrue(seedream_model.enabled)
 
 
 class SeedreamProviderTest(unittest.TestCase):

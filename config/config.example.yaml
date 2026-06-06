@@ -16,7 +16,7 @@ service:
   callback_timeout_seconds: 15
   callback_max_retries: 3
   callback_retry_interval_seconds: 3
-  default_model: seadance-2.0   # 消息未指定 modelKey 时使用的默认模型
+  default_model: seedream-5-lite # 消息未指定 modelKey 时使用的默认模型
 
 # ---------------------------------------------------------------------------
 # rabbitmq — 消息队列连接
@@ -125,17 +125,6 @@ providers:
 #   3. 如需设为默认模型，修改上方 service.default_model
 # ============================================================================
 models:
-  seadance-2.0:
-    provider: jimeng
-    enabled: true
-    req_key: jimeng_t2i_v40       # 即梦文生图 4.0，支持参考图输入
-    extra:
-      scale: 0.5                  # 参考图影响强度 0~1
-      force_single: 1             # 强制单图输出
-      poll_interval_seconds: 2    # 轮询间隔
-      timeout_seconds: 300        # 任务超时（秒）
-      return_url: true
-
   jimeng-t2i-v40:
     provider: jimeng
     enabled: true
@@ -149,7 +138,7 @@ models:
 
   seedream-5-lite:
     provider: seedream
-    enabled: false
+    enabled: true
     req_key: doubao-seedream-5-0-260128
     extra:
       size: 2K
