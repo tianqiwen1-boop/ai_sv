@@ -13,7 +13,7 @@ from volcengine.visual.VisualService import VisualService
 from app.config import DownloadConfig, ModelConfig, ProviderConfig
 from app.errors import ConfigError, NonRetryableError
 from app.models import GenerateMessage
-from app.prompt import build_final_prompt
+from app.prompt import append_negative_prompt, build_final_prompt, build_negative_prompt
 from app.providers.base import ImageProvider
 from app.retry import retry_call
 
@@ -57,7 +57,10 @@ class JimengProvider(ImageProvider):
         if not message.imageUrl.strip():
             raise NonRetryableError("imageUrl 为空")
 
-        prompt = build_final_prompt(message.promptTemplate, message.userPrompt)
+        prompt = append_negative_prompt(
+            build_final_prompt(message.promptTemplate, message.userPrompt),
+            build_negative_prompt(message.negativePromptTemplate),
+        )
         extra = model.extra
         scale = float(extra.get("scale", 0.5))
         force_single = int(extra.get("force_single", 1))

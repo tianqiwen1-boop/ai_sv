@@ -11,7 +11,7 @@ from PIL import Image
 from app.config import DownloadConfig, ModelConfig, ProviderConfig
 from app.errors import ConfigError, NonRetryableError
 from app.models import GenerateMessage
-from app.prompt import build_final_prompt
+from app.prompt import build_final_prompt, build_negative_prompt
 from app.providers.base import ImageProvider
 from app.retry import retry_call
 
@@ -39,6 +39,7 @@ class HunyuanProvider(ImageProvider):
             raise ConfigError(f"provider {provider.name}: missing api_key")
 
         prompt = build_final_prompt(message.promptTemplate, message.userPrompt)
+        negative_prompt = build_negative_prompt(message.negativePromptTemplate)
         extra = model.extra
         poll_interval = float(extra.get("poll_interval_seconds", 2))
         timeout_seconds = float(extra.get("timeout_seconds", 300))
@@ -47,11 +48,13 @@ class HunyuanProvider(ImageProvider):
             provider=provider,
             model=model,
             prompt=prompt,
+            negative_prompt=negative_prompt,
             image_url=message.imageUrl.strip(),
             size=str(extra.get("size", "1024:1024")),
             seed=extra.get("seed"),
             revise=extra.get("revise"),
             logo_add=extra.get("logo_add", 0),
+            negative_prompt_field=str(extra.get("negative_prompt_field", "negative_prompt")),
             extra_body=extra.get("extra_body"),
         )
         image_url = self._wait_job(
@@ -70,11 +73,13 @@ class HunyuanProvider(ImageProvider):
         provider: ProviderConfig,
         model: ModelConfig,
         prompt: str,
+        negative_prompt: str,
         image_url: str,
         size: str,
         seed: Any,
         revise: Any,
         logo_add: Any,
+        negative_prompt_field: str,
         extra_body: Any,
     ) -> str:
         payload: dict[str, Any] = {
@@ -83,6 +88,8 @@ class HunyuanProvider(ImageProvider):
             "images": [image_url],
             "size": size,
         }
+        if negative_prompt:
+            payload[negative_prompt_field or "negative_prompt"] = negative_prompt
         if seed is not None and str(seed).strip().lower() not in {"", "random"}:
             payload["seed"] = int(seed)
         if revise is not None and str(revise).strip() != "":

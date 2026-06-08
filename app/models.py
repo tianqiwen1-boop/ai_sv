@@ -7,6 +7,7 @@ class GenerateMessage(BaseModel):
     userPrompt: str | None = None
     style: str
     promptTemplate: str | None = None
+    negativePromptTemplate: str | None = None
     modelKey: str | None = None
     sizeMode: str | None = None
     gridMin: int | None = None

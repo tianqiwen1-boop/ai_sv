@@ -159,6 +159,7 @@ models:
     req_key: hy-image-v3.0
     extra:
       size: 1024:1024
+      negative_prompt_field: negative_prompt
       revise: 0
       logo_add: 0
       poll_interval_seconds: 2

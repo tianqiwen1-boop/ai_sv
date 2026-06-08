@@ -9,7 +9,7 @@ from app.errors import NonRetryableError
 from app.grid_selector import choose_final_grid_size, resolve_candidate_grids
 from app.models import GenerateMessage
 from app.perfect_pixel_processor import PerfectPixelProcessor
-from app.prompt import build_final_prompt
+from app.prompt import append_negative_prompt, build_final_prompt, build_negative_prompt
 
 
 class PromptTest(unittest.TestCase):
@@ -18,6 +18,13 @@ class PromptTest(unittest.TestCase):
 
     def test_template_and_user(self) -> None:
         self.assertEqual(build_final_prompt("template", "extra"), "template extra")
+
+    def test_negative_prompt(self) -> None:
+        self.assertEqual(build_negative_prompt(" avoid "), "avoid")
+        self.assertEqual(
+            append_negative_prompt("prompt", "bad details"),
+            "prompt\n\n请避免：bad details",
+        )
 
     def test_empty_template_raises(self) -> None:
         with self.assertRaises(NonRetryableError):
@@ -260,11 +267,13 @@ class HunyuanProviderTest(unittest.TestCase):
                 provider=provider_cfg,
                 model=model,
                 prompt="pixel prompt",
+                negative_prompt="messy details",
                 image_url="https://example.com/input.png",
                 size="1024:1024",
                 seed=None,
                 revise=0,
                 logo_add=0,
+                negative_prompt_field="negative_prompt",
                 extra_body=None,
             )
 
@@ -278,6 +287,7 @@ class HunyuanProviderTest(unittest.TestCase):
         payload = post.call_args.kwargs["json"]
         self.assertEqual(payload["model"], "hy-image-v3.0")
         self.assertEqual(payload["prompt"], "pixel prompt")
+        self.assertEqual(payload["negative_prompt"], "messy details")
         self.assertEqual(payload["images"], ["https://example.com/input.png"])
         self.assertEqual(payload["size"], "1024:1024")
         self.assertEqual(payload["revise"], 0)

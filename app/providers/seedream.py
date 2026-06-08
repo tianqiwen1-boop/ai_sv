@@ -10,7 +10,7 @@ from PIL import Image
 from app.config import DownloadConfig, ModelConfig, ProviderConfig
 from app.errors import ConfigError, NonRetryableError
 from app.models import GenerateMessage
-from app.prompt import build_final_prompt
+from app.prompt import append_negative_prompt, build_final_prompt, build_negative_prompt
 from app.providers.base import ImageProvider
 from app.retry import retry_call
 
@@ -37,7 +37,10 @@ class SeedreamProvider(ImageProvider):
         if not provider.api_key.strip():
             raise ConfigError(f"provider {provider.name}: missing api_key")
 
-        prompt = build_final_prompt(message.promptTemplate, message.userPrompt)
+        prompt = append_negative_prompt(
+            build_final_prompt(message.promptTemplate, message.userPrompt),
+            build_negative_prompt(message.negativePromptTemplate),
+        )
         extra = model.extra
         output_url = self._generate_image_url(
             provider=provider,
