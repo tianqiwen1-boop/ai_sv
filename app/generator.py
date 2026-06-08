@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 _PROVIDER_IMPORTS: dict[str, tuple[str, str]] = {
     "jimeng": ("app.providers.jimeng", "JimengProvider"),
     "seedream": ("app.providers.seedream", "SeedreamProvider"),
+    "hunyuan": ("app.providers.hunyuan", "HunyuanProvider"),
 }
 
 

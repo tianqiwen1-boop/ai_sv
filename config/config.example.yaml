@@ -84,6 +84,11 @@ providers:
     base_url: ${ARK_BASE_URL:https://ark.cn-beijing.volces.com/api/v3}
     api_key: ${ARK_API_KEY}
 
+  hunyuan:
+    type: hunyuan
+    base_url: ${HUNYUAN_IMAGE_BASE_URL:https://tokenhub.tencentmaas.com/v1/api/image}
+    api_key: ${HUNYUAN_IMAGE_API_KEY}
+
   # ---- 以下为可扩展的 provider 模板（取消注释即可启用） ----
 
   # 硅基流动 SiliconFlow — Bearer token 鉴权，OpenAI 兼容路径但参数非标
@@ -146,6 +151,17 @@ models:
       response_format: url
       watermark: false
       sequential_image_generation: disabled
+      timeout_seconds: 300
+
+  hunyuan-image-v3:
+    provider: hunyuan
+    enabled: false
+    req_key: hy-image-v3.0
+    extra:
+      size: 1024:1024
+      revise: 0
+      logo_add: 0
+      poll_interval_seconds: 2
       timeout_seconds: 300
 
   # ---- 以下为可扩展的模型模板（取消注释即可启用） ----

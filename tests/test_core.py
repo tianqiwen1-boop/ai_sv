@@ -103,6 +103,7 @@ class ConfigTest(unittest.TestCase):
             "VOLC_ACCESS_KEY_ID": "test-ak",
             "VOLC_SECRET_ACCESS_KEY": "test-sk",
             "ARK_API_KEY": "test-ark-key",
+            "HUNYUAN_IMAGE_API_KEY": "test-hunyuan-key",
         }
         with patch.dict(os.environ, env, clear=False):
             config = load_config(str(example))
@@ -113,6 +114,9 @@ class ConfigTest(unittest.TestCase):
             seedream_model = config.models["seedream-5-lite"]
             self.assertEqual(seedream_model.provider, "seedream")
             self.assertTrue(seedream_model.enabled)
+            hunyuan_model = config.models["hunyuan-image-v3"]
+            self.assertEqual(hunyuan_model.provider, "hunyuan")
+            self.assertFalse(hunyuan_model.enabled)
 
 
 class SeedreamProviderTest(unittest.TestCase):
@@ -195,6 +199,89 @@ class SeedreamProviderTest(unittest.TestCase):
         self.assertEqual(payload["output_format"], "png")
         self.assertFalse(payload["watermark"])
         self.assertEqual(payload["sequential_image_generation"], "disabled")
+
+
+class HunyuanProviderTest(unittest.TestCase):
+    def test_endpoints(self) -> None:
+        from app.config import ProviderConfig
+        from app.providers.hunyuan import HunyuanProvider
+
+        provider = ProviderConfig(
+            name="hunyuan",
+            type="hunyuan",
+            base_url="https://tokenhub.example.com/v1/api/image",
+            api_key="test-key",
+        )
+        self.assertEqual(
+            HunyuanProvider._submit_endpoint(provider),
+            "https://tokenhub.example.com/v1/api/image/submit",
+        )
+        self.assertEqual(
+            HunyuanProvider._query_endpoint(provider),
+            "https://tokenhub.example.com/v1/api/image/query",
+        )
+
+    def test_extract_image_url(self) -> None:
+        from app.providers.hunyuan import HunyuanProvider
+
+        payload = {"status": "completed", "data": [{"url": "https://example.com/out.png"}]}
+        self.assertEqual(
+            HunyuanProvider._extract_image_url(payload),
+            "https://example.com/out.png",
+        )
+
+    def test_submit_job_payload(self) -> None:
+        from app.config import DownloadConfig, ModelConfig, ProviderConfig
+        from app.providers.hunyuan import HunyuanProvider
+
+        provider = HunyuanProvider(
+            DownloadConfig(max_retries=1, retry_interval_seconds=0, timeout_seconds=5)
+        )
+        provider_cfg = ProviderConfig(
+            name="hunyuan",
+            type="hunyuan",
+            base_url="https://tokenhub.example.com/v1/api/image",
+            api_key="test-key",
+        )
+        model = ModelConfig(
+            key="hunyuan-image-v3",
+            provider="hunyuan",
+            enabled=True,
+            req_key="hy-image-v3.0",
+            extra={},
+        )
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"id": "job-123", "status": "queued"}
+        mock_resp.raise_for_status.return_value = None
+
+        with patch.object(provider._session, "post", return_value=mock_resp) as post:
+            job_id = provider._submit_job(
+                provider=provider_cfg,
+                model=model,
+                prompt="pixel prompt",
+                image_url="https://example.com/input.png",
+                size="1024:1024",
+                seed=None,
+                revise=0,
+                logo_add=0,
+                extra_body=None,
+            )
+
+        self.assertEqual(job_id, "job-123")
+        post.assert_called_once()
+        self.assertEqual(
+            post.call_args.args[0],
+            "https://tokenhub.example.com/v1/api/image/submit",
+        )
+        self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "Bearer test-key")
+        payload = post.call_args.kwargs["json"]
+        self.assertEqual(payload["model"], "hy-image-v3.0")
+        self.assertEqual(payload["prompt"], "pixel prompt")
+        self.assertEqual(payload["images"], ["https://example.com/input.png"])
+        self.assertEqual(payload["size"], "1024:1024")
+        self.assertEqual(payload["revise"], 0)
+        self.assertEqual(payload["logo_add"], 0)
 
 
 class CallbackTest(unittest.TestCase):
