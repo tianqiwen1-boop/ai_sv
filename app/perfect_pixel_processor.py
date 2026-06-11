@@ -22,8 +22,9 @@ class PerfectPixelProcessor:
 
         width, height, refined = get_perfect_pixel(
             rgb,
-            sample_method="median",
-            refine_intensity=0.25,
+            sample_method="center",
+            refine_intensity=0.08,
+            fix_square=False,
             debug=False,
         )
 
