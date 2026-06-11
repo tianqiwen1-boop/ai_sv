@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from pydantic import ValidationError
 
 from app.errors import NonRetryableError
-from app.grid_selector import choose_final_grid_size, resolve_grid_range
+from app.grid_selector import resolve_grid_range
 from app.models import GenerateMessage
 from app.perfect_pixel_processor import PerfectPixelProcessor
 
@@ -81,7 +81,6 @@ class MessageHandler:
                 perfect_pixel_error = str(exc)[:1000]
                 logger.warning("Perfect Pixel 澶辫触 taskId=%s error=%s", task_id, exc)
 
-            final_grid = choose_final_grid_size(message, detected_w, detected_h)
             grid_min, grid_max = resolve_grid_range(message)
             self._callback.success(
                 task_id,
@@ -94,8 +93,8 @@ class MessageHandler:
                 grid_max=grid_max,
                 detected_grid_width=detected_w,
                 detected_grid_height=detected_h,
-                final_grid_width=final_grid,
-                final_grid_height=final_grid,
+                final_grid_width=detected_w,
+                final_grid_height=detected_h,
                 perfect_pixel_status=perfect_pixel_status,
                 perfect_pixel_error=perfect_pixel_error,
             )
