@@ -10,9 +10,12 @@ class GenerateMessage(BaseModel):
     negativePromptTemplate: str | None = None
     modelKey: str | None = None
     sizeMode: str | None = None
+    sizePreset: str | None = None
+    sizePresetName: str | None = None
     gridMin: int | None = None
     gridMax: int | None = None
     candidateGrids: list[int] | None = None
+    defaultGrid: int | None = None
     brand: str | None = None
     colorCount: int | None = None
     mirror: bool | None = None

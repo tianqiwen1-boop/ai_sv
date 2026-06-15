@@ -7,14 +7,20 @@ DEFAULT_CANDIDATES = [32, 36, 40, 44, 48, 56, 64, 72, 80]
 
 
 def default_range(size_mode: str | None) -> tuple[int, int]:
-    if (size_mode or "").strip().lower() == "small":
+    normalized = (size_mode or "").strip().lower()
+    if normalized == "small":
         return 24, 40
+    if normalized == "detailed":
+        return 48, 104
     return 30, 80
 
 
 def default_candidates(size_mode: str | None) -> list[int]:
-    if (size_mode or "").strip().lower() == "small":
+    normalized = (size_mode or "").strip().lower()
+    if normalized == "small":
         return SMALL_CANDIDATES.copy()
+    if normalized == "detailed":
+        return [48, 56, 64, 72, 80, 88, 96, 104]
     return DEFAULT_CANDIDATES.copy()
 
 
@@ -34,7 +40,7 @@ def resolve_candidate_grids(message: GenerateMessage) -> list[int]:
     if candidates:
         return candidates
 
-    fallback = 32 if (message.sizeMode or "").strip().lower() == "small" else 48
+    fallback = int(message.defaultGrid or (32 if (message.sizeMode or "").strip().lower() == "small" else 48))
     fallback = min(max(fallback, grid_min), grid_max)
     return [fallback]
 
@@ -45,7 +51,7 @@ def choose_final_grid_size(
     detected_height: int | None,
 ) -> int:
     candidates = resolve_candidate_grids(message)
-    fallback = 32 if (message.sizeMode or "").strip().lower() == "small" else 48
+    fallback = int(message.defaultGrid or (32 if (message.sizeMode or "").strip().lower() == "small" else 48))
 
     if detected_width and detected_height and detected_width > 0 and detected_height > 0:
         detected = (float(detected_width) + float(detected_height)) / 2.0
