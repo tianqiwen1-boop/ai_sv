@@ -33,8 +33,6 @@ class HunyuanProvider(ImageProvider):
         model: ModelConfig,
         provider: ProviderConfig,
     ) -> bytes:
-        if not message.imageUrl.strip():
-            raise NonRetryableError("imageUrl is empty")
         if not provider.api_key.strip():
             raise ConfigError(f"provider {provider.name}: missing api_key")
 
@@ -85,9 +83,10 @@ class HunyuanProvider(ImageProvider):
         payload: dict[str, Any] = {
             "model": model.req_key or model.key,
             "prompt": prompt,
-            "images": [image_url],
             "size": size,
         }
+        if image_url:
+            payload["images"] = [image_url]
         if negative_prompt:
             payload[negative_prompt_field or "negative_prompt"] = negative_prompt
         if seed is not None and str(seed).strip().lower() not in {"", "random"}:

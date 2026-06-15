@@ -57,8 +57,6 @@ class MessageHandler:
         )
 
         try:
-            if not message.imageUrl.strip():
-                raise NonRetryableError("imageUrl 为空")
 
             self._safe_processing_callback(task_id)
 
@@ -71,15 +69,18 @@ class MessageHandler:
             perfect_pixel_error: str | None = None
             result_image = raw_image
 
-            try:
-                refined = self._perfect_pixel.refine(image_bytes)
-                detected_w = refined.width
-                detected_h = refined.height
-                result_image = self._storage.upload_png(task_id, refined.png_bytes, variant="refined")
-            except Exception as exc:
-                perfect_pixel_status = "FAILED"
-                perfect_pixel_error = str(exc)[:1000]
-                logger.warning("Perfect Pixel 澶辫触 taskId=%s error=%s", task_id, exc)
+            if message.imageUrl.strip():
+                try:
+                    refined = self._perfect_pixel.refine(image_bytes)
+                    detected_w = refined.width
+                    detected_h = refined.height
+                    result_image = self._storage.upload_png(task_id, refined.png_bytes, variant="refined")
+                except Exception as exc:
+                    perfect_pixel_status = "FAILED"
+                    perfect_pixel_error = str(exc)[:1000]
+                    logger.warning("Perfect Pixel refine failed taskId=%s error=%s", task_id, exc)
+            else:
+                perfect_pixel_status = "SKIPPED"
 
             grid_min, grid_max = resolve_grid_range(message)
             final_grid_size = choose_final_grid_size(message, detected_w, detected_h)

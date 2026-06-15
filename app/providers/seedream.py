@@ -32,8 +32,6 @@ class SeedreamProvider(ImageProvider):
         model: ModelConfig,
         provider: ProviderConfig,
     ) -> bytes:
-        if not message.imageUrl.strip():
-            raise NonRetryableError("imageUrl is empty")
         if not provider.api_key.strip():
             raise ConfigError(f"provider {provider.name}: missing api_key")
 
@@ -79,7 +77,6 @@ class SeedreamProvider(ImageProvider):
         payload: dict[str, Any] = {
             "model": model.req_key or model.key,
             "prompt": prompt,
-            "image": image_url,
             "size": size,
             "response_format": response_format,
             "output_format": output_format,
@@ -87,6 +84,8 @@ class SeedreamProvider(ImageProvider):
             "sequential_image_generation": sequential_image_generation,
             "stream": False,
         }
+        if image_url:
+            payload["image"] = image_url
         if optimize_prompt_options is not None:
             payload["optimize_prompt_options"] = optimize_prompt_options
         if seed is not None and str(seed).strip().lower() not in {"", "random"}:

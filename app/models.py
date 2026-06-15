@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 class GenerateMessage(BaseModel):
     taskId: str
-    imageUrl: str
+    imageUrl: str = ""
     userPrompt: str | None = None
     style: str
     promptTemplate: str | None = None

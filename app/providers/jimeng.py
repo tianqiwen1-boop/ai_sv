@@ -54,8 +54,6 @@ class JimengProvider(ImageProvider):
         model: ModelConfig,
         provider: ProviderConfig,
     ) -> bytes:
-        if not message.imageUrl.strip():
-            raise NonRetryableError("imageUrl 为空")
 
         prompt = append_negative_prompt(
             build_final_prompt(message.promptTemplate, message.userPrompt),
@@ -123,8 +121,9 @@ class JimengProvider(ImageProvider):
             "scale": scale,
             "force_single": force_single,
             "req_json": JimengProvider._req_json(return_url),
-            "image_urls": [image_url],
         }
+        if image_url:
+            form["image_urls"] = [image_url]
         resp = client.cv_sync2async_submit_task(form)
         if resp.get("code") != 10000:
             raise NonRetryableError(f"即梦提交失败: {json.dumps(resp, ensure_ascii=False)}")
