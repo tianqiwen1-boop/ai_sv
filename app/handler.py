@@ -69,7 +69,9 @@ class MessageHandler:
             perfect_pixel_error: str | None = None
             result_image = raw_image
 
-            if message.imageUrl.strip():
+            if message.style == "ADMIN_PROMPT_TEST":
+                perfect_pixel_status = "SKIPPED"
+            elif message.imageUrl.strip():
                 try:
                     refined = self._perfect_pixel.refine(image_bytes)
                     detected_w = refined.width
