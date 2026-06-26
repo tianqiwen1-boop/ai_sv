@@ -19,6 +19,7 @@ class GenerateMessage(BaseModel):
     brand: str | None = None
     colorCount: int | None = None
     mirror: bool | None = None
+    skipPerfectPixel: bool | None = None
     createdAt: str | None = None
 
 

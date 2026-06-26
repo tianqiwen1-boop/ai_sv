@@ -9,27 +9,31 @@ from app.errors import NonRetryableError
 from app.grid_selector import choose_final_grid_size, resolve_candidate_grids
 from app.models import GenerateMessage
 from app.perfect_pixel_processor import PerfectPixelProcessor
-from app.prompt import append_negative_prompt, build_final_prompt, build_negative_prompt
+from app.prompt import BASE_NEGATIVE_PROMPT, BASE_POSITIVE_PROMPT, append_negative_prompt, build_final_prompt, build_negative_prompt
 
 
 class PromptTest(unittest.TestCase):
     def test_template_only(self) -> None:
-        self.assertEqual(build_final_prompt("template", ""), "template")
+        result = build_final_prompt("template", "")
+        self.assertIn(BASE_POSITIVE_PROMPT, result)
+        self.assertIn("Style: template", result)
 
     def test_template_and_user(self) -> None:
-        self.assertEqual(build_final_prompt("template", "extra"), "template extra")
+        result = build_final_prompt("template", "extra")
+        self.assertIn("Style: template", result)
+        self.assertIn("User note: extra", result)
 
     def test_negative_prompt(self) -> None:
-        self.assertEqual(build_negative_prompt(" avoid "), "avoid")
+        self.assertEqual(build_negative_prompt(""), BASE_NEGATIVE_PROMPT)
+        self.assertIn("avoid", build_negative_prompt(" avoid "))
         self.assertEqual(
             append_negative_prompt("prompt", "bad details"),
-            "prompt\n\n请避免：bad details",
+            "prompt\n\nAvoid: bad details",
         )
 
     def test_empty_template_raises(self) -> None:
         with self.assertRaises(NonRetryableError):
             build_final_prompt("", "extra")
-
 
 class MessageTest(unittest.TestCase):
     def test_parse_message(self) -> None:
@@ -44,12 +48,14 @@ class MessageTest(unittest.TestCase):
             "gridMin": 30,
             "gridMax": 80,
             "candidateGrids": [32, 36, 40, 44, 48, 56, 64, 72, 80],
+            "skipPerfectPixel": True,
             "createdAt": "2026-05-25 12:00:00",
         }
         msg = GenerateMessage.model_validate(raw)
         self.assertEqual(msg.taskId, "AI123")
         self.assertEqual(msg.modelKey, "jimeng-t2i-v40")
         self.assertEqual(msg.gridMin, 30)
+        self.assertTrue(msg.skipPerfectPixel)
 
 
 class GridSelectorTest(unittest.TestCase):

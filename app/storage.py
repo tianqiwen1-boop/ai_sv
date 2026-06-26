@@ -42,6 +42,7 @@ class ImageStorage:
                 Key=key,
                 Body=image_bytes,
                 ContentType="image/png",
+                ACL="public-read",
             )
 
         try:

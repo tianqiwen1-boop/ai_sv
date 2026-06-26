@@ -69,7 +69,7 @@ class MessageHandler:
             perfect_pixel_error: str | None = None
             result_image = raw_image
 
-            if message.style == "ADMIN_PROMPT_TEST":
+            if message.skipPerfectPixel:
                 perfect_pixel_status = "SKIPPED"
             elif message.imageUrl.strip():
                 try:
